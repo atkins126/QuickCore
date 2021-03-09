@@ -34,7 +34,7 @@ unit Quick.Core.DependencyInjection;
 interface
 
 uses
-  {$IFDEF DEBUG_DI}
+  {$IFDEF DEBUG}
     Quick.Debug.Utils,
   {$ENDIF}
   System.SysUtils,
@@ -172,6 +172,7 @@ type
   end;
 
   EServiceConfigError = class(Exception);
+  EServiceBuildError = class(Exception);
 
 implementation
 
@@ -187,9 +188,16 @@ end;
 
 class function TServiceCollection.CreateFromStartup<T> : TServiceCollection;
 begin
-  Result := TServiceCollection.Create;
-  T.ConfigureServices(Result);
-  Result.Build;
+  try
+    Result := TServiceCollection.Create;
+    T.ConfigureServices(Result);
+    Result.Build;
+  except
+    on E : Exception do
+    begin
+      raise EServiceBuildError.CreateFmt('DependencyInjection: Failed to build services (%s)',[e.Message]);
+    end;
+  end;
 end;
 
 destructor TServiceCollection.Destroy;
@@ -259,6 +267,7 @@ end;
 function TServiceCollection.AddLogging(aLoggerService: ILogger): TServiceCollection;
 begin
   Result := Self;
+  if aLoggerService = nil then aLoggerService := TNullLogger.Create;
   fLoggerService := aLoggerService;
   fDependencyInjector.RegisterInstance<ILogger>(aLoggerService).AsSingleton;
 end;
